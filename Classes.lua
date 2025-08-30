@@ -1950,76 +1950,94 @@ all:RegisterAuras( {
                 return
             end
 
-            if unit == "player" or UnitCanAttack( "player", unit ) then
-                local spell, _, _, startCast, endCast, _, _, notInterruptible, spellID = UnitCastingInfo( unit )
+            -- Helper function to check casting for a specific unit
+            local function checkUnitCasting( checkUnit )
+                if checkUnit == "player" or UnitCanAttack( "player", checkUnit ) then
+                    local spell, _, _, startCast, endCast, _, _, notInterruptible, spellID = UnitCastingInfo( checkUnit )
 
-                if spell then
-                    startCast = startCast / 1000
-                    endCast = endCast / 1000
+                    if spell then
+                        startCast = startCast / 1000
+                        endCast = endCast / 1000
 
-                    t.name = spell
-                    t.count = 1
-                    t.expires = endCast
-                    t.applied = startCast
-                    t.duration = endCast - startCast
-                    t.v1 = spellID
-                    t.v2 = notInterruptible and 1 or 0
-                    t.v3 = 0
-                    t.caster = unit
+                        t.name = spell
+                        t.count = 1
+                        t.expires = endCast
+                        t.applied = startCast
+                        t.duration = endCast - startCast
+                        t.v1 = spellID
+                        t.v2 = notInterruptible and 1 or 0
+                        t.v3 = 0
+                        t.caster = checkUnit
 
-                    if unit ~= "target" then return end
+                        if checkUnit == "target" or checkUnit == "focus" then
+                            if (checkUnit == "target" and state.target.is_dummy) or (checkUnit == "focus" and UnitClassification("focus") == "dummy") then
+                                -- Pretend that all casts by target dummies are interruptible.
+                                if Hekili.ActiveDebug then Hekili:Debug( "Cast '%s' is fake-interruptible on %s", spell, checkUnit ) end
+                                t.v2 = 0
 
-                    if state.target.is_dummy then
-                        -- Pretend that all casts by target dummies are interruptible.
-                        if Hekili.ActiveDebug then Hekili:Debug( "Cast '%s' is fake-interruptible", spell ) end
-                        t.v2 = 0
+                            elseif Hekili.DB.profile.toggles.interrupts.filterCasts and class.spellFilters[ state.instance_id ] and class.interruptibleFilters and not class.interruptibleFilters[ spellID ] then
+                                if Hekili.ActiveDebug then Hekili:Debug( "Cast '%s' not interruptible per user preference on %s.", spell, checkUnit ) end
+                                t.v2 = 1
+                            end
+                        end
 
-                    elseif Hekili.DB.profile.toggles.interrupts.filterCasts and class.spellFilters[ state.instance_id ] and class.interruptibleFilters and not class.interruptibleFilters[ spellID ] then
-                        if Hekili.ActiveDebug then Hekili:Debug( "Cast '%s' not interruptible per user preference.", spell ) end
-                        t.v2 = 1
+                        return true
                     end
 
+                    spell, _, _, startCast, endCast, _, notInterruptible, spellID = UnitChannelInfo( checkUnit )
+                    startCast = ( startCast or 0 ) / 1000
+                    endCast = ( endCast or 0 ) / 1000
+                    local duration = endCast - startCast
+
+                    -- Channels greater than 10 seconds are nonsense.  Probably.
+                    if spell and duration <= 10 then
+                        t.name = spell
+                        t.count = 1
+                        t.expires = endCast
+                        t.applied = startCast
+                        t.duration = duration
+                        t.v1 = spellID
+                        t.v2 = notInterruptible and 1 or 0
+                        t.v3 = 1 -- channeled.
+                        t.caster = checkUnit
+
+                        if class.abilities[ spellID ] and class.abilities[ spellID ].dontChannel then
+                            removeBuff( "casting" )
+                            return true
+                        end
+
+                        if checkUnit == "target" or checkUnit == "focus" then
+                            if (checkUnit == "target" and state.target.is_dummy) or (checkUnit == "focus" and UnitClassification("focus") == "dummy") then
+                                -- Pretend that all casts by target dummies are interruptible.
+                                if Hekili.ActiveDebug then Hekili:Debug( "Channel '%s' is fake-interruptible on %s", spell, checkUnit ) end
+                                t.v2 = 0
+
+                            elseif Hekili.DB.profile.toggles.interrupts.filterCasts and class.spellFilters[ state.instance_id ] and class.interruptibleFilters and not class.interruptibleFilters[ spellID ] then
+                                if Hekili.ActiveDebug then Hekili:Debug( "Channel '%s' not interruptible per user preference on %s.", spell, checkUnit ) end
+                                t.v2 = 1
+                            end
+                        end
+
+                        return true
+                    end
+                end
+                return false
+            end
+
+            -- For debuff type (interrupts), prioritize focus target if it exists
+            if auraType == "debuff" and UnitExists( "focus" ) then
+                -- Focus target exists, only check focus target
+                if checkUnitCasting( "focus" ) then
                     return
                 end
-
-                spell, _, _, startCast, endCast, _, notInterruptible, spellID = UnitChannelInfo( unit )
-                startCast = ( startCast or 0 ) / 1000
-                endCast = ( endCast or 0 ) / 1000
-                local duration = endCast - startCast
-
-                -- Channels greater than 10 seconds are nonsense.  Probably.
-                if spell and duration <= 10 then
-                    t.name = spell
-                    t.count = 1
-                    t.expires = endCast
-                    t.applied = startCast
-                    t.duration = duration
-                    t.v1 = spellID
-                    t.v2 = notInterruptible and 1 or 0
-                    t.v3 = 1 -- channeled.
-                    t.caster = unit
-
-                    if class.abilities[ spellID ] and class.abilities[ spellID ].dontChannel then
-                        removeBuff( "casting" )
-                        return
-                    end
-
-                    if unit ~= "target" then return end
-
-                    if state.target.is_dummy then
-                        -- Pretend that all casts by target dummies are interruptible.
-                        if Hekili.ActiveDebug then Hekili:Debug( "Channel '%s' is fake-interruptible", spell ) end
-                        t.v2 = 0
-
-                    elseif Hekili.DB.profile.toggles.interrupts.filterCasts and class.spellFilters[ state.instance_id ] and class.interruptibleFilters and not class.interruptibleFilters[ spellID ] then
-                        if Hekili.ActiveDebug then Hekili:Debug( "Channel '%s' not interruptible per user preference.", spell ) end
-                        t.v2 = 1
-                    end
-
+            else
+                -- No focus target, check the primary unit (target)
+                if checkUnitCasting( unit ) then
                     return
                 end
             end
 
+            -- No casting found
             t.name = "Casting"
             t.count = 0
             t.expires = 0
