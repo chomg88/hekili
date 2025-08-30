@@ -911,6 +911,7 @@ do
         -- UNIT_FLAGS = 1,
 
         PLAYER_TARGET_CHANGED = 1,
+        PLAYER_FOCUS_CHANGED = 1,
 
         PLAYER_ENTERING_WORLD = 1,
         PLAYER_REGEN_ENABLED = 1,
@@ -2968,6 +2969,225 @@ function Hekili:BuildUI()
     if Hekili.Config then
         ns.StartConfiguration(true)
     end
+
+    -- Toggle Status Panel
+    local toggleStatus = self.DB.profile.toggleStatus or {
+        enabled = true,
+        width = 100,
+        height = 50,
+        x = 0,
+        y = -200,
+        font = "PT Sans Narrow",
+        fontSize = 12,
+        fontStyle = "OUTLINE"
+    }
+    
+    -- Ensure button dimensions exist
+    toggleStatus.buttonWidth = toggleStatus.buttonWidth or 45
+    toggleStatus.buttonHeight = toggleStatus.buttonHeight or 25
+    toggleStatus.buttonSpacing = toggleStatus.buttonSpacing or 10
+    
+    self.DB.profile.toggleStatus = toggleStatus
+
+    local f = ns.UI.ToggleStatus or CreateFrame( "Frame", "HekiliToggleStatus", UIParent )
+    Hekili:ProfileFrame( "HekiliToggleStatus", f )
+
+    f:SetSize( toggleStatus.width * scaleFactor, toggleStatus.height * scaleFactor )
+    f:SetClampedToScreen( true )
+    f:ClearAllPoints()
+    f:SetPoint("CENTER", nil, "CENTER", toggleStatus.x, toggleStatus.y )
+
+    -- Create Mode button (display mode toggle)
+    f.ModeButton = CreateFrame("Button", "HekiliToggleStatusMode", f)
+    f.ModeButton:SetSize(toggleStatus.buttonWidth * scaleFactor, toggleStatus.buttonHeight * scaleFactor)
+    f.ModeButton:SetPoint("LEFT", f, "LEFT", 0, 0)
+
+    -- 배경 및 테두리 생성
+    f.ModeButton.Backdrop = Mixin(CreateFrame("Frame", "HekiliToggleStatusModeBackdrop", f.ModeButton), BackdropTemplateMixin)
+    f.ModeButton.Backdrop:SetAllPoints(f.ModeButton)
+    f.ModeButton.Backdrop:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        tile = false,
+        tileSize = 0,
+        edgeSize = 1,
+        insets = { left = 0, right = 0, top = 0, bottom = 0 }
+    })
+    f.ModeButton.Backdrop:SetFrameLevel(f.ModeButton:GetFrameLevel() - 1)
+    f.ModeButton.Backdrop:SetBackdropColor(0.1, 0.1, 0.1, 0.7)
+    f.ModeButton.Backdrop:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+
+    -- 버튼 자체에는 텍스트를 설정하지 않음
+    f.ModeButton:SetText("")
+
+    -- 대신 별도의 레이블 생성
+    f.ModeButton.Label = f:CreateFontString(nil, "OVERLAY")
+    f.ModeButton.Label:SetFont(LSM:Fetch("font", toggleStatus.font), toggleStatus.fontSize, toggleStatus.fontStyle)
+    f.ModeButton.Label:SetPoint("CENTER", f.ModeButton, "CENTER", 0, 0)
+    -- f.ModeButton.Label:SetText("Auto")
+    f.ModeButton.Label:SetTextColor(1, 1, 1)
+
+    -- 클릭 기능
+    f.ModeButton:SetScript("OnClick", function(self)
+        Hekili:FireToggle("mode")
+    end)
+
+    -- Create CDs button (텍스트 레이블 방식)
+    f.CDsButton = CreateFrame("Button", "HekiliToggleStatusCDs", f)
+    f.CDsButton:SetSize(toggleStatus.buttonWidth * scaleFactor, toggleStatus.buttonHeight * scaleFactor)
+    f.CDsButton:SetPoint("LEFT", f.ModeButton, "RIGHT", toggleStatus.buttonSpacing * scaleFactor, 0)
+
+    -- 배경 및 테두리 생성
+    f.CDsButton.Backdrop = Mixin(CreateFrame("Frame", "HekiliToggleStatusCDsBackdrop", f.CDsButton), BackdropTemplateMixin)
+    f.CDsButton.Backdrop:SetAllPoints(f.CDsButton)
+    f.CDsButton.Backdrop:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        tile = false,
+        tileSize = 0,
+        edgeSize = 1,
+        insets = { left = 0, right = 0, top = 0, bottom = 0 }
+    })
+    f.CDsButton.Backdrop:SetFrameLevel(f.CDsButton:GetFrameLevel() - 1)
+    f.CDsButton.Backdrop:SetBackdropColor(0.1, 0.1, 0.1, 0.7)
+    f.CDsButton.Backdrop:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+
+    -- 버튼 자체에는 텍스트를 설정하지 않음
+    f.CDsButton:SetText("")
+
+    -- 대신 별도의 레이블 생성
+    f.CDsButton.Label = f:CreateFontString(nil, "OVERLAY")
+    f.CDsButton.Label:SetFont(LSM:Fetch("font", toggleStatus.font), toggleStatus.fontSize, toggleStatus.fontStyle)
+    f.CDsButton.Label:SetPoint("CENTER", f.CDsButton, "CENTER", 0, 0)
+    f.CDsButton.Label:SetText("CDs")
+    f.CDsButton.Label:SetTextColor(1, 1, 1)
+
+    -- 클릭 기능
+    f.CDsButton:SetScript("OnClick", function(self)
+        Hekili:FireToggle("cooldowns")
+    end)
+
+    -- 마우스 오버 효과
+    f.CDsButton:SetScript("OnEnter", function(self)
+        self.Backdrop:SetBackdropColor(0.2, 0.2, 0.2, 0.8)
+    end)
+    f.CDsButton:SetScript("OnLeave", function(self)
+        self.Backdrop:SetBackdropColor(0.1, 0.1, 0.1, 0.7)
+    end)
+
+    -- Create Kick button (동일한 방식 적용)
+    f.KickButton = CreateFrame("Button", "HekiliToggleStatusKick", f)
+    f.KickButton:SetSize(toggleStatus.buttonWidth * scaleFactor, toggleStatus.buttonHeight * scaleFactor)
+    f.KickButton:SetPoint("LEFT", f.CDsButton, "RIGHT", toggleStatus.buttonSpacing * scaleFactor, 0)
+
+    -- 배경 및 테두리 생성
+    f.KickButton.Backdrop = Mixin(CreateFrame("Frame", "HekiliToggleStatusKickBackdrop", f.KickButton), BackdropTemplateMixin)
+    f.KickButton.Backdrop:SetAllPoints(f.KickButton)
+    f.KickButton.Backdrop:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        tile = false,
+        tileSize = 0,
+        edgeSize = 1,
+        insets = { left = 0, right = 0, top = 0, bottom = 0 }
+    })
+    f.KickButton.Backdrop:SetFrameLevel(f.KickButton:GetFrameLevel() - 1)
+    f.KickButton.Backdrop:SetBackdropColor(0.1, 0.1, 0.1, 0.7)
+    f.KickButton.Backdrop:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+
+    -- 버튼 자체에는 텍스트를 설정하지 않음
+    f.KickButton:SetText("")
+
+    -- 대신 별도의 레이블 생성
+    f.KickButton.Label = f:CreateFontString(nil, "OVERLAY")
+    f.KickButton.Label:SetFont(LSM:Fetch("font", toggleStatus.font), toggleStatus.fontSize, toggleStatus.fontStyle)
+    f.KickButton.Label:SetPoint("CENTER", f.KickButton, "CENTER", 0, 0)
+    f.KickButton.Label:SetText("Kick")
+    f.KickButton.Label:SetTextColor(1, 1, 1)
+
+    -- 클릭 기능
+    f.KickButton:SetScript("OnClick", function(self)
+        Hekili:FireToggle("interrupts")
+    end)
+
+    -- 마우스 오버 효과
+    f.KickButton:SetScript("OnEnter", function(self)
+        self.Backdrop:SetBackdropColor(0.2, 0.2, 0.2, 0.8)
+    end)
+    f.KickButton:SetScript("OnLeave", function(self)
+        self.Backdrop:SetBackdropColor(0.1, 0.1, 0.1, 0.7)
+    end)
+
+    -- 토글 상태에 따른 색상 업데이트
+    f:SetScript("OnUpdate", function(self, elapsed)
+        local profile = Hekili.DB.profile
+        
+        -- Mode 버튼 텍스트 및 색상 업데이트
+        local currentMode = profile.toggles.mode.value
+        local modeLabels = {
+            automatic = "Auto",
+            single = "Single", 
+            aoe = "AOE",
+            dual = "Dual",
+            reactive = "React"
+        }
+        self.ModeButton:SetText("")
+        self.ModeButton.Label:SetText(modeLabels[currentMode])
+
+        
+        -- Mode 버튼은 항상 활성화 상태로 표시 (파란색 계열)
+        self.ModeButton.Backdrop:SetBackdropColor(0.0, 0.0, 0.3, 0.7)
+        self.ModeButton.Backdrop:SetBackdropBorderColor(0.0, 0.5, 0.8, 1.0)
+        self.ModeButton.Label:SetTextColor(0.5, 0.8, 1)
+
+        if not (modeLabels[currentMode] == "Auto") then
+            self.ModeButton.Label:SetTextColor(1, 0, 0)
+        else
+            self.ModeButton.Label:SetTextColor(0.5, 0.8, 1)
+        end
+        
+        -- CDs 버튼 색상 업데이트
+        if profile.toggles.cooldowns.value then
+            self.CDsButton.Backdrop:SetBackdropColor(0.0, 0.3, 0.0, 0.7)
+            self.CDsButton.Backdrop:SetBackdropBorderColor(0.0, 0.8, 0.0, 1.0)
+            self.CDsButton.Label:SetTextColor(0, 1, 0) -- 활성화 상태일 때 녹색 텍스트
+        else
+            self.CDsButton.Backdrop:SetBackdropColor(0.3, 0.0, 0.0, 0.7)
+            self.CDsButton.Backdrop:SetBackdropBorderColor(0.8, 0.0, 0.0, 1.0)
+            self.CDsButton.Label:SetTextColor(1, 0, 0) -- 비활성화 상태일 때 빨간색 텍스트
+        end
+
+        -- Kick 버튼 색상 업데이트
+        if profile.toggles.interrupts.value then
+            self.KickButton.Backdrop:SetBackdropColor(0.0, 0.3, 0.0, 0.7)
+            self.KickButton.Backdrop:SetBackdropBorderColor(0.0, 0.8, 0.0, 1.0)
+            self.KickButton.Label:SetTextColor(0, 1, 0) -- 활성화 상태일 때 녹색 텍스트
+        else
+            self.KickButton.Backdrop:SetBackdropColor(0.3, 0.0, 0.0, 0.7)
+            self.KickButton.Backdrop:SetBackdropBorderColor(0.8, 0.0, 0.0, 1.0)
+            self.KickButton.Label:SetTextColor(1, 0, 0) -- 비활성화 상태일 때 빨간색 텍스트
+        end
+    end)
+
+    -- Add movement functionality
+    f:EnableMouse(true)
+    f:SetMovable(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", function(self)
+        self:StartMoving()
+    end)
+    f:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        local _, _, _, x, y = self:GetPoint()
+        toggleStatus.x = x
+        toggleStatus.y = y
+    end)
+
+    if not toggleStatus.enabled then f:Hide()
+    else f:Show() end
+
+    ns.UI.ToggleStatus = f
+    -- End Toggle Status Panel
 end
 
 local T = ns.lib.Format.Tokens
