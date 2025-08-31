@@ -91,6 +91,10 @@ ns.auras = {
     player = {
         buff = {},
         debuff = {}
+    },
+    focus_target = {
+        buff = {},
+        debuff = {}
     }
 }
 
@@ -472,6 +476,65 @@ function Hekili:SaveDebugSnapshot( dispName )
             sort( tbOrder )
 
 
+            local focusBuffs = {}
+            local fbOrder = {}
+
+            AuraUtil.ForEachAura( "focus", "HELPFUL", nil, function( aura )
+                local model = class.auras[ aura.spellId ]
+                local key = model and model.key or formatKey( aura.name )
+
+                local offset = 0
+                local newKey = key
+
+                while( focusBuffs[ newKey ] ) do
+                    offset = offset + 1
+                    newKey = format( "%s_%d", key, offset )
+                end
+                if newKey ~= key then key = newKey end
+
+                fbOrder[ #fbOrder + 1 ] = key
+                longestKey = max( longestKey, key:len() )
+                longestName = max( longestName, aura.name:len() )
+
+                focusBuffs[ key ] = {}
+                local elem = focusBuffs[ key ]
+
+                elem.spellId = aura.spellId
+                elem.key = key
+                elem.name = aura.name
+
+                elem.count = aura.applications > 0 and aura.applications or 1
+                elem.remains = aura.expirationTime > 0 and ( aura.expirationTime - now ) or 3600
+
+                local scraped = state.auras.focus_target.buff[ model and model.key or key ]
+                if scraped and scraped.applied > 0 then
+                    elem.sCount = scraped.count > 0 and scraped.count or 1
+                    elem.sRemains = scraped.expires > 0 and ( scraped.expires - now ) or 3600
+                end
+            end, true )
+
+            for token, caught in pairs( state.auras.focus_target.buff ) do
+                if not focusBuffs[ token ] and caught.expires > 0 then
+                    focusBuffs[ token ] = {
+                        spellId = caught.id,
+                        key = caught.key,
+                        name = "",
+
+                        count = 0,
+                        remains = 0,
+
+                        sCount = caught.count > 0 and caught.count or 1,
+                        sRemains = caught.expires > 0 and ( caught.expires - now ) or 3600
+                    }
+
+                    fbOrder[ #fbOrder + 1 ] = token
+                    longestKey = max( longestKey, token:len() )
+                end
+            end
+
+            sort( fbOrder )
+
+
             local targetDebuffs = {}
             local tdOrder = {}
 
@@ -532,6 +595,67 @@ function Hekili:SaveDebugSnapshot( dispName )
 
             sort( tdOrder )
 
+
+            local focusDebuffs = {}
+            local fdOrder = {}
+
+            AuraUtil.ForEachAura( "focus", "HARMFUL", nil, function( aura )
+                if aura.isFromPlayerOrPlayerPet then
+                    local model = class.auras[ aura.spellId ]
+                    local key = model and model.key or formatKey( aura.name )
+
+                    local offset = 0
+                    local newKey = key
+
+                    while( focusDebuffs[ newKey ] ) do
+                        offset = offset + 1
+                        newKey = format( "%s_%d", key, offset )
+                    end
+                    if newKey ~= key then key = newKey end
+
+                    fdOrder[ #fdOrder + 1 ] = key
+                    longestKey = max( longestKey, key:len() )
+                    longestName = max( longestName, aura.name:len() )
+
+                    focusDebuffs[ key ] = {}
+                    local elem = focusDebuffs[ key ]
+
+                    elem.spellId = aura.spellId
+                    elem.key = key
+                    elem.name = aura.name
+
+                    elem.count = aura.applications > 0 and aura.applications or 1
+                    elem.remains = aura.expirationTime > 0 and ( aura.expirationTime - now ) or 3600
+
+                    local scraped = state.auras.focus_target.debuff[ model and model.key or key ]
+                    if scraped and scraped.applied > 0 then
+                        elem.sCount = scraped.count > 0 and scraped.count or 1
+                        elem.sRemains = scraped.expires > 0 and ( scraped.expires - now ) or 3600
+                    end
+                end
+            end, true )
+
+            for token, caught in pairs( state.auras.focus_target.debuff ) do
+                if not focusDebuffs[ token ] and caught.expires > 0 then
+                    focusDebuffs[ token ] = {
+                        spellId = caught.id,
+                        key = caught.key,
+                        name = "",
+
+                        count = 0,
+                        remains = 0,
+
+                        sCount = caught.count > 0 and caught.count or 1,
+                        sRemains = caught.expires > 0 and ( caught.expires - now ) or 3600
+                    }
+
+                    fdOrder[ #fdOrder + 1 ] = token
+                    longestKey = max( longestKey, token:len() )
+                end
+            end
+
+            sort( fdOrder )
+
             local header = "     n  | ID      | Token" .. string.rep( " ", longestKey - 4 ) .. " | Name" .. string.rep( " ", longestName - 4 ) .. " | A. Count | A. Remains | S. Count | S. Remains\n"
                 .. "    --- | ------- | " .. string.rep( "-", longestKey + 1 ) .. " | " .. string.rep( "-", longestName ) .. " | -------- | ---------- | -------- | ----------"
 
@@ -590,6 +714,35 @@ function Hekili:SaveDebugSnapshot( dispName )
 
             else
                 auraString = auraString .. "\n\ntarget_debuffs: none"
+            end
+
+            if #fbOrder > 0 then
+                auraString = auraString .. "\n\nfocus_buffs:\n" .. header
+
+                for i, token in ipairs( fbOrder ) do
+                    local aura = focusBuffs[ token ]
+                    local model = class.auras[ token ]
+
+                    auraString = format( "%s\n     %-2d | %7d | %s%-" .. longestKey .. "s | %-" .. longestName .. "s | %8d | %10.2f | %8d | %10.2f",
+                        auraString, i, model and model.id or -1, model and " " or "*", token, aura.name, aura.count, aura.remains, aura.sCount or -1, aura.sRemains or - 1 )
+                end
+
+            else
+                auraString = auraString .. "\n\nfocus_buffs: none"
+            end
+
+            if #fdOrder > 0 then
+                auraString = auraString .. "\n\nfocus_debuffs:\n" .. header
+
+                for i, token in ipairs( fdOrder ) do
+                    local aura = focusDebuffs[ token ]
+
+                    auraString = format( "%s\n     %-2d | %7d | %s%-" .. longestKey .. "s | %-" .. longestName .. "s | %8d | %10.2f | %8d | %10.2f",
+                        auraString, i, class.auras[ token ] and class.auras[ token ].id or -1, ( class.auras[ token ] and " " or "*" ), token, aura.name, aura.count, aura.remains, aura.sCount or -1, aura.sRemains or - 1 )
+                end
+
+            else
+                auraString = auraString .. "\n\nfocus_debuffs: none"
             end
 
 
