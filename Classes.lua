@@ -1990,7 +1990,7 @@ all:RegisterAuras( {
                     local duration = endCast - startCast
 
                     -- Channels greater than 10 seconds are nonsense.  Probably.
-                    if spell and duration <= 10 then
+                    if spell and duration <= 15 then
                         t.name = spell
                         t.count = 1
                         t.expires = endCast
