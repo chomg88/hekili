@@ -1340,11 +1340,22 @@ state.timeToInterrupt = timeToInterrupt
 -- Check if interrupt ability is within range of focus target
 local function canInterruptFocus()
     if not UnitExists( "focus" ) then return false end
+   
+
+    local interruptSpellId = 0
+    if state.class.file == "HUNTER" then
+        interruptSpellId = 147362
+    elseif state.class.file == "DEATHKNIGHT" then
+        interruptSpellId = 47528
+    elseif state.class.file == "DEMONHUNTER" then
+        interruptSpellId = 183752
+    end
     
-    -- Use specific interrupt spell ID (47528 - 정신 얼리기)
-    local interruptSpellId = 47528
-    
+    if interruptSpellId == 0 then return true end
+
     -- Check if the interrupt spell is within range of focus
+    local isSpellInRange = LSR.IsSpellInRange( interruptSpellId, "focus" )
+    
     if LSR.IsSpellInRange( interruptSpellId, "focus" ) == 1 then
         return true
     end
