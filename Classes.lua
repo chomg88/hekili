@@ -2032,10 +2032,14 @@ all:RegisterAuras( {
 
             -- For debuff type (interrupts), prioritize focus target if it exists
             if auraType == "debuff" and UnitExists( "focus" ) then
-                -- Focus target exists, only check focus target
-                if checkUnitCasting( "focus" ) then
-                    return
+                -- Focus target exists, check if we can interrupt it (within range)
+                if state.canInterruptFocus() then
+                    -- We can interrupt focus target, only check focus target
+                    if checkUnitCasting( "focus" ) then
+                        return
+                    end
                 end
+                
             else
                 -- No focus target, check the primary unit (target)
                 if checkUnitCasting( unit ) then
