@@ -1345,10 +1345,21 @@ local function canInterruptFocus()
     local interruptSpellId = 0
     if state.class.file == "HUNTER" then
         interruptSpellId = 147362
+        -- if state.spec.beast_mastery then
+        --     interruptSpellId = 147362
+        -- end
+        -- if state.spec.marksmanship then
+        --     interruptSpellId = 147362
+        -- end
+        -- if state.spec.survival then
+        --     interruptSpellId = 147362
+        -- end
     elseif state.class.file == "DEATHKNIGHT" then
         interruptSpellId = 47528
     elseif state.class.file == "DEMONHUNTER" then
         interruptSpellId = 183752
+    elseif state.class.file == "PALADIN" then
+        interruptSpellId = 96231
     end
     
     if interruptSpellId == 0 then return true end
